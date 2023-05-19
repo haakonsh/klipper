@@ -1,0 +1,55 @@
+New AVR ADC API that supports differential inputs
+
+
+Problem:
+The default thermistor sampling circuit in the Einsy Rambo(Prusa MK3*) control board is poorly designed, and a possible improvement utilizing a differential input ADC channel cannot be implemented using the current ADC API.
+
+Current ADC API defines 16 single-ended and no differential input channels. Where Atmega2560(Einsy Rambo) supports 18 single-ended and 22 differential input channels[Table 26-4 Input Channel Selections in Atmega2560 datasheet]. 
+
+Current ADC API defines 16 ADC channels where each channel is referenced via the following struct:
+
+struct gpio_adc {
+    uint8_t chan;
+};
+
+and where each channel is mapped to a physical pin by the index of the following struct:
+
+static const uint8_t adc_pins[] PROGMEM = {
+...
+    GPIO('F', 0), GPIO('F', 1), GPIO('F', 2), GPIO('F', 3),
+    GPIO('F', 4), GPIO('F', 5), GPIO('F', 6), GPIO('F', 7),
+    GPIO('K', 0), GPIO('K', 1), GPIO('K', 2), GPIO('K', 3),
+    GPIO('K', 4), GPIO('K', 5), GPIO('K', 6), GPIO('K', 7),
+...
+};
+
+The Atmega2560 registers ADMUX and ADCSRB controls the ADC input selection through the MUX0:5 bits, where ADMUX contains the MUX0:4 bits and ADCSRB contain the MUX5 bit. MUX0:2 represent analog input pin 0-7 and MUX5 represents whether the analog input pins of port F or K is used.
+
+uint32_t
+gpio_adc_sample(struct gpio_adc g)
+{
+...
+    // Set the channel to sample
+#if defined(ADCSRB) && defined(MUX5)
+    // The MUX5 bit of ADCSRB selects whether we're reading from
+    // channels 0 to 7 (MUX5 low) or 8 to 15 (MUX5 high).
+    ADCSRB = ((g.chan >> 3) & 0x01) << MUX5;
+#endif
+    ADMUX = ADMUX_DEFAULT | (g.chan & 0x07);
+...
+}
+
+In gpio_adc_sample() hardcodes whether port K or F is used based on a configuration flag. This drops the amount of ADC channels down to 8.
+
+I need an ADC API that can represent all of the given AVR's ADC channels rather than an arbitrary sub-set.
+
+Solution:
+An ADC channel is mapped directly to the AVR's MUX bits:
+
+struct gpio_adc {
+    uint8_t adcsra;
+    uint8_t adcsrb;
+    uint8_t admux;
+    uint8_t didr0;
+    uint8_t didr2;
+};

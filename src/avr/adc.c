@@ -10,6 +10,7 @@
 #include "internal.h" // GPIO
 #include "pgm.h" // PROGMEM
 #include "sched.h" // sched_shutdown
+#include <string.h>
 
 static const uint8_t adc_pins[] PROGMEM = {
 #if CONFIG_MACH_atmega168 || CONFIG_MACH_atmega328 || CONFIG_MACH_atmega328p
@@ -41,37 +42,43 @@ DECL_ENUMERATION_RANGE("pin", "PE2", GPIO('E', 2), 2);
 enum { ADMUX_DEFAULT = 0x40 };
 enum { ADC_ENABLE = (1<<ADPS0)|(1<<ADPS1)|(1<<ADPS2)|(1<<ADEN)|(1<<ADIF) };
 
-DECL_CONSTANT("ADC_MAX", 1023);
+DECL_CONSTANT("ADC_MAX", 1023);  //TODO: What is this constant used for?
 
+//TODO: Configure ADC accordingly
 struct gpio_adc
-gpio_adc_setup(uint8_t pin)
+gpio_adc_setup(uint8_t admux)
 {
     // Find pin in adc_pins table
-    uint8_t chan;
-    for (chan=0; ; chan++) {
-        if (chan >= ARRAY_SIZE(adc_pins))
-            shutdown("Not a valid ADC pin");
-        if (READP(adc_pins[chan]) == pin)
-            break;
-    }
+    struct gpio_adc adc_cfg;
+    memset(&adc_cfg, 0x00, sizeof(adc_cfg));
+
+    adc_cfg.admux = admux;
+
+    if (adc_cfg.admux >= 0b111110)
+        shutdown("Not a valid ADC input channel");
 
     // Enable ADC
-    ADCSRA = ADC_ENABLE;
+    adc_cfg.adcsra = ADC_ENABLE;
+    ADCSRA = adc_cfg.adcsra;
 
     // Disable digital input for this pin
-#ifdef DIDR2
-    if (chan >= 8)
-        DIDR2 |= 1 << (chan & 0x07);
+    if (adc_cfg.admux >= 0b100000)
+        adc_cfg.didr2 = 1 << (adc_cfg.admux & 0x07);
+    else if(adc_cfg.admux & (0b001001 | 0b001000))
+        adc_cfg.didr0 = (1 << 0) | (1 << 1);
     else
-#endif
-        DIDR0 |= 1 << chan;
+        adc_cfg.didr0 = 1 << (adc_cfg.admux & 0x07);
 
-    return (struct gpio_adc){ chan };
+    DIDR0 |= adc_cfg.didr0;
+    DIDR2 |= adc_cfg.didr2;
+    
+    return adc_cfg;
 }
 
 enum { ADC_DUMMY=0xff };
 static uint8_t last_analog_read = ADC_DUMMY;
 
+//TODO: Configure ADC accordingly. Done!
 // Try to sample a value. Returns zero if sample ready, otherwise
 // returns the number of clock ticks the caller should wait before
 // retrying this function.
@@ -81,21 +88,18 @@ gpio_adc_sample(struct gpio_adc g)
     if (ADCSRA & (1<<ADSC))
         // Busy
         goto need_delay;
-    if (last_analog_read == g.chan)
+    if (last_analog_read == g.admux)
         // Sample now ready
         return 0;
     if (last_analog_read != ADC_DUMMY)
         // Sample on another channel in progress
         goto need_delay;
-    last_analog_read = g.chan;
+    last_analog_read = g.admux;
 
     // Set the channel to sample
-#if defined(ADCSRB) && defined(MUX5)
-    // The MUX5 bit of ADCSRB selects whether we're reading from
-    // channels 0 to 7 (MUX5 low) or 8 to 15 (MUX5 high).
-    ADCSRB = ((g.chan >> 3) & 0x01) << MUX5;
-#endif
-    ADMUX = ADMUX_DEFAULT | (g.chan & 0x07);
+    ADCSRB = g.adcsrb;
+    //ADMUX = ADMUX_DEFAULT | (g.admux & 0x07);
+    ADMUX = g.admux;
 
     // Start the sample
     ADCSRA = ADC_ENABLE | (1<<ADSC);
@@ -105,18 +109,25 @@ need_delay:
     return (13 + 1) * 128 + 200;
 }
 
+//TODO: Check the sign bit (10th) and pad bits accordingly. Done!
+//TODO: Change return type from uint16_t to int16_t. Done!
 // Read a value; use only after gpio_adc_sample() returns zero
-uint16_t
+int16_t
 gpio_adc_read(struct gpio_adc g)
 {
     last_analog_read = ADC_DUMMY;
-    return ADC;
+    if(ADC & 0x200)   // Check the sign bit (10th)
+    {        
+        return ADC | 0xFC00; // Pad 1's (two's complement)
+    }
+
+    return ADC;                     
 }
 
 // Cancel a sample that may have been started with gpio_adc_sample()
 void
 gpio_adc_cancel_sample(struct gpio_adc g)
 {
-    if (last_analog_read == g.chan)
+    if (last_analog_read == g.admux)
         last_analog_read = ADC_DUMMY;
 }

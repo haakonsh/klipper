@@ -1,0 +1,17 @@
+{
+	"folders": [
+		{
+			"path": "../../../../../home/holdhus/Documents/Klipper/klipper"
+		}
+	],
+	"settings": {
+		"files.associations": {
+			"internal.h": "c",
+			"irq.h": "c",
+			"basecmd.h": "c",
+			"command.h": "c",
+			"sched.h": "c",
+			"setjmp.h": "c"
+		}
+	}
+}
