@@ -42,7 +42,10 @@ DECL_ENUMERATION_RANGE("pin", "PE2", GPIO('E', 2), 2);
 enum { ADMUX_DEFAULT = 0x40 };
 enum { ADC_ENABLE = (1<<ADPS0)|(1<<ADPS1)|(1<<ADPS2)|(1<<ADEN)|(1<<ADIF) };
 
-DECL_CONSTANT("ADC_MAX", 1023);  //TODO: What is this constant used for?
+//TODO: What is this constant used for?
+// ADC_MAX and _MIN is used to verify that an analog sensor is within range. F.ex min and max temperatures.
+DECL_CONSTANT("ADC_MAX", 1023);
+DECL_CONSTANT("ADC_MIN", -512);
 
 //TODO: Configure ADC accordingly
 struct gpio_adc
