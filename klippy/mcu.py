@@ -518,8 +518,8 @@ class MCU_adc:
         if not self._sample_count:
             return
         self._oid = self._mcu.create_oid()
-        self._mcu.add_config_cmd("config_analog_in oid=%d pin=%s" % (
-            self._oid, self._pin))
+        self._mcu.add_config_cmd("config_analog_in oid=%d admux=%d" % (
+            self._oid, self._pin)) #TODO Change type of 'pin' argument from string to u8 in order to represent and actual adc channel (ADMUX)
         clock = self._mcu.get_query_slot(self._oid)
         sample_ticks = self._mcu.seconds_to_clock(self._sample_time)
         mcu_adc_max = self._mcu.get_constant_float("ADC_MAX")
