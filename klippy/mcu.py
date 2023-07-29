@@ -491,7 +491,7 @@ class MCU_pwm:
 class MCU_adc:
     def __init__(self, mcu, pin_params):
         self._mcu = mcu
-        self._pin = pin_params['pin']
+        self._pin = pin_params['pin'] #TODO: What is pin_params?
         self._min_sample = self._max_sample = 0.
         self._sample_time = self._report_time = 0.
         self._sample_count = self._range_check_count = 0
@@ -503,7 +503,7 @@ class MCU_adc:
     def get_mcu(self):
         return self._mcu
     def setup_minmax(self, sample_time, sample_count,
-                     minval=0., maxval=1., range_check_count=0):
+                     minval=-1., maxval=1., range_check_count=0):
         self._sample_time = sample_time
         self._sample_count = sample_count
         self._min_sample = minval
@@ -518,17 +518,21 @@ class MCU_adc:
         if not self._sample_count:
             return
         self._oid = self._mcu.create_oid()
-        self._mcu.add_config_cmd("config_analog_in oid=%d admux=%d" % (
-            self._oid, self._pin)) #TODO Change type of 'pin' argument from string to u8 in order to represent and actual adc channel (ADMUX)
+        self._mcu.add_config_cmd("config_analog_in oid=%d admux=%s" % (
+            self._oid, self._pin))
         clock = self._mcu.get_query_slot(self._oid)
         sample_ticks = self._mcu.seconds_to_clock(self._sample_time)
         mcu_adc_max = self._mcu.get_constant_float("ADC_MAX")
+        mcu_adc_min = self._mcu.get_constant_float("ADC_MIN")
         max_adc = self._sample_count * mcu_adc_max
+        min_adc = self._sample_count * mcu_adc_min
         self._inv_max_adc = 1.0 / max_adc
+        self._inv_min_adc = 1.0 / min_adc
         self._report_clock = self._mcu.seconds_to_clock(self._report_time)
-        min_sample = max(0, min(0xffff, int(self._min_sample * max_adc)))
-        max_sample = max(0, min(0xffff, int(
-            math.ceil(self._max_sample * max_adc))))
+        min_sample = max(int(-0x8000), min(0, math.floor(self._min_sample * min_adc))) #TODO: Set min adc vals
+        #min_sample = int(-0x8000)
+        max_sample = int(0x7fff)
+        #max_sample = max(0, min(int(0x7fff), math.ceil(self._max_sample * max_adc)))
         self._mcu.add_config_cmd(
             "query_analog_in oid=%d clock=%d sample_ticks=%d sample_count=%d"
             " rest_ticks=%d min_value=%d max_value=%d range_check_count=%d" % (

@@ -32,7 +32,8 @@ analog_in_event(struct timer *timer)
         a->timer.waketime += sample_delay;
         return SF_RESCHEDULE;
     }
-    uint16_t value = gpio_adc_read(a->adc_cfg);
+    int16_t value = gpio_adc_read(a->adc_cfg);// TODO: Change value from uint16_t to int16_t
+    output("adc value from gpio_adc_read(): %hi", value);
     uint8_t state = a->state;
     if (state >= a->sample_count)
     {
@@ -49,6 +50,7 @@ analog_in_event(struct timer *timer)
         a->timer.waketime += a->sample_time;
         return SF_RESCHEDULE;
     }
+
     if (likely(a->value >= a->min_value && a->value <= a->max_value))
     {
         a->invalid_count = 0;
@@ -58,6 +60,10 @@ analog_in_event(struct timer *timer)
         a->invalid_count++;
         if (a->invalid_count >= a->range_check_count)
         {
+            output("a->adc_cfg.admux=%c", a->adc_cfg.admux);
+            output("a->value=%hi", a->value);
+            output("a->min_value=%hi", a->min_value);
+            output("a->max_value=%hi", a->max_value);
             try_shutdown("ADC out of range");
             a->invalid_count = 0;
         }
@@ -93,6 +99,9 @@ void command_query_analog_in(uint32_t *args)
     a->min_value = args[5];
     a->max_value = args[6];
     a->range_check_count = args[7];
+    output("a->adc_cfg.admux=%c", a->adc_cfg.admux);
+    output("a->min_value=%hi", a->min_value);
+    output("a->max_value=%hi", a->max_value);
     if (!a->sample_count)
         return;
     sched_add_timer(&a->timer);

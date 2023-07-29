@@ -44,7 +44,8 @@ enum { ADC_ENABLE = (1<<ADPS0)|(1<<ADPS1)|(1<<ADPS2)|(1<<ADEN)|(1<<ADIF) };
 
 //TODO: What is this constant used for?
 // ADC_MAX and _MIN is used to verify that an analog sensor is within range. F.ex min and max temperatures.
-DECL_CONSTANT("ADC_MAX", 1023);
+// Set min/max to minimum and maximum values a single ADC sample can have: 10bit sign-extended to 16-bit = +2^10-1 to -2^10
+DECL_CONSTANT("ADC_MAX", 511);
 DECL_CONSTANT("ADC_MIN", -512);
 
 //TODO: Configure ADC accordingly
@@ -55,10 +56,12 @@ gpio_adc_setup(uint8_t admux)
     struct gpio_adc adc_cfg;
     memset(&adc_cfg, 0x00, sizeof(adc_cfg));
 
-    adc_cfg.admux = admux;
-
-    if (adc_cfg.admux >= 0b111110)
+    if (admux >= 0b111110)
         shutdown("Not a valid ADC input channel");
+
+    adc_cfg.admux = ADMUX_DEFAULT | admux;
+    adc_cfg.adcsrb = (admux & (1 << 5));
+    output("adc_cfg.admux=%c", adc_cfg.admux);
 
     // Enable ADC
     adc_cfg.adcsra = ADC_ENABLE;
