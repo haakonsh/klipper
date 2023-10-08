@@ -491,7 +491,7 @@ class MCU_pwm:
 class MCU_adc:
     def __init__(self, mcu, pin_params):
         self._mcu = mcu
-        self._pin = pin_params['pin'] #TODO: What is pin_params?
+        self._pin = pin_params['pin']
         self._min_sample = self._max_sample = 0.
         self._sample_time = self._report_time = 0.
         self._sample_count = self._range_check_count = 0
@@ -542,7 +542,11 @@ class MCU_adc:
         self._mcu.register_response(self._handle_analog_in_state,
                                     "analog_in_state", self._oid)
     def _handle_analog_in_state(self, params):
-        last_value = params['value'] * self._inv_max_adc
+        # logging.info("Type of adc value passed to _handle_analog_in_state:")
+        # logging.info(type(params['value']))
+        # logging.info("ADC value passed to _handle_analog_in_state: ")
+        # logging.info(params['value'])
+        last_value = params['value'] * self._inv_max_adc        #TODO: Do I need to sign-convert samples on MCU side?
         next_clock = self._mcu.clock32_to_clock64(params['next_clock'])
         last_read_clock = next_clock - self._report_clock
         last_read_time = self._mcu.clock_to_print_time(last_read_clock)

@@ -33,7 +33,6 @@ analog_in_event(struct timer *timer)
         return SF_RESCHEDULE;
     }
     int16_t value = gpio_adc_read(a->adc_cfg);// TODO: Change value from uint16_t to int16_t
-    output("adc value from gpio_adc_read(): %hi", value);
     uint8_t state = a->state;
     if (state >= a->sample_count)
     {
@@ -60,11 +59,6 @@ analog_in_event(struct timer *timer)
         a->invalid_count++;
         if (a->invalid_count >= a->range_check_count)
         {
-            output("a->adc_cfg.admux=%c", a->adc_cfg.admux);
-            output("a->value=%hi", a->value);
-            output("a->min_value=%hi", a->min_value);
-            output("a->max_value=%hi", a->max_value);
-            try_shutdown("ADC out of range");
             a->invalid_count = 0;
         }
     }
@@ -126,10 +120,34 @@ void analog_in_task(void)
             irq_enable();
             continue;
         }
-        uint16_t value = a->value;
+        int16_t value = a->value; //TODO: Change to int? Done!
+        uint8_t admux = a->adc_cfg.admux - 0x40;
+        if(admux == 2)
+        {
+            static uint16_t counter = 1;
+            static int16_t accumulator = 0;
+            int16_t average = 0;
+            accumulator += value;
+            if(!(counter % 64))
+            {
+                average = accumulator/64;
+                output("admux=%c", admux);
+                output("Average ADC offset = %hi", average);
+                accumulator = 0;
+            }
+            counter++;        
+        }
+            
         uint32_t next_begin_time = a->next_begin_time;
         a->state++;
+        if(admux == 2)
+        {
+            value += 10;
+            // if(value < 0) value = 0;
+        }
         irq_enable();
+        output("admux=%c", admux);
+        output("value=%hi", value);
         sendf("analog_in_state oid=%c next_clock=%u value=%hi", oid, next_begin_time, value);
     }
 }

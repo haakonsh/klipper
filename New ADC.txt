@@ -73,7 +73,6 @@ TODO: Done!
 
 TODO:
     Verify ADC values. For some reason the bed thermistor report negative ADC codes, and they are out of range of a single-channel ADC.
-        
 
 TODO:
     Find the definitions of ADC min and max values given by the MCU command query_analog_in of adccmds.c:100
@@ -82,21 +81,8 @@ TODO:
 
         I don't know who passes these arguments yet.
 
+
 TODO: 
-
-
-
-Compile and flash:
-sudo printer_data/config/RatOS/boards/prusa-einsy/make-and-flash-mcu.sh 
-
-Test klippy /w logs:
-sudo klippy-env/bin/python klipper/klippy/klippy.py -v printer_data/config/printer.cfg -l printer_data/logs/klippy.log -I printer_data/comms/klippy.serial
-
-Read MCU memory:
-sudo klippy-env/bin/python  klipper/scripts/dump_mcu.py -s 0x0 -l 0x3 ../../dev/prusa-einsy debug.bin && hd -v debug.bin
-
-allocate_oids count=10
-config_analog_in oid=0 admux=2
-finalize_config crc=3455
-query_analog_in oid=0 clock=0 sample_ticks=1000000 sample_count=100 rest_ticks=5000
-get_config
+    The MCU's ADC min/max values are defined universally for all channels. This is a problem when ADC channels have a different ranges.
+    Typical use-case is when both single-ended and differential channels are in use. I suggest to use unique min/max definitions
+    for each enabled channel.

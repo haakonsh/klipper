@@ -59,7 +59,7 @@ gpio_adc_setup(uint8_t admux)
     if (admux >= 0b111110)
         shutdown("Not a valid ADC input channel");
 
-    adc_cfg.admux = ADMUX_DEFAULT | admux;
+    adc_cfg.admux = admux;
     adc_cfg.adcsrb = (admux & (1 << 5));
     output("adc_cfg.admux=%c", adc_cfg.admux);
 
@@ -70,14 +70,15 @@ gpio_adc_setup(uint8_t admux)
     // Disable digital input for this pin
     if (adc_cfg.admux >= 0b100000)
         adc_cfg.didr2 = 1 << (adc_cfg.admux & 0x07);
-    else if(adc_cfg.admux & (0b001001 | 0b001000))
+    else if(adc_cfg.admux & (0b001001))
         adc_cfg.didr0 = (1 << 0) | (1 << 1);
     else
         adc_cfg.didr0 = 1 << (adc_cfg.admux & 0x07);
 
     DIDR0 |= adc_cfg.didr0;
     DIDR2 |= adc_cfg.didr2;
-    
+
+    adc_cfg.admux |= ADMUX_DEFAULT;    
     return adc_cfg;
 }
 
@@ -104,9 +105,8 @@ gpio_adc_sample(struct gpio_adc g)
 
     // Set the channel to sample
     ADCSRB = g.adcsrb;
-    //ADMUX = ADMUX_DEFAULT | (g.admux & 0x07);
     ADMUX = g.admux;
-
+    //output("ADMUX=%c ADCSRA=%c ADCSRB=%c DIDR0=%c DIDR1=%c DIDR2=%c", ADMUX, ADCSRA, ADCSRB, DIDR0, DIDR1, DIDR2);    
     // Start the sample
     ADCSRA = ADC_ENABLE | (1<<ADSC);
 
