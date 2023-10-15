@@ -135,5 +135,25 @@ TODO:
 10. I think at this we have completed the tasks required bystep 7 and 9. The MCU should now be ready for the regular printer commands
     issued by the Klippy-host.
 
-This is valid for MCU_adc and similar classes, but there's still some questions. Like what are sensor factories? And are 'heaters' used?
 
+This is valid for MCU_adc and similar classes, but there's still some questions. Like what are sensor factories? And are 'heaters' used?
+    
+    sensor_factories is the name of a dictionary that holds all sensors that a given PrinterHeater instance contains. 
+    sensor_factories is used to create a Heater object who in turn will setup a sensor from sensor_factories if it is of the correct 
+    sensor type. Why is a PrinterHeaters object used to hold a dict of sensors? Or rather, why not use a 'sensor_factories' dict
+    in the main MCU class to hold all sensor types available to the MCU? Why leave it up to the various sub-systems to hold unique
+    and local sensor_factories?
+
+1.  PrinterHeaters.setup_heater() calls PrinterHeaters.setup_sensor(), PrinterHeaters.register_sensor() and creats a Heater object
+    with the given sensor. The Heater class defines the sensor API (finnaly!).
+
+    When is PrinterHeaters.setup_heater() called?
+
+2.  extras/heater_bed.py:27 PrinterHeaterBed is created by a load_config(). 
+    Where PrinterHeaterBed calls PrinterHeaters.setup_heater(). 
+    
+    Similarly extruder.py:331 add_printer_objects() creates a PrinterExtruder object who also calls 
+    PrinterHeaters.setup_heater(). toolhead.py:605 add_printer_objects() calls kinematics/extruder.py's add_printer_objects().
+    And toolhead.add_printer_objects() is called by klippy.py:142 Printer._read_config().
+
+    
