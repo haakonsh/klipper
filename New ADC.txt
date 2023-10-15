@@ -86,3 +86,54 @@ TODO:
     The MCU's ADC min/max values are defined universally for all channels. This is a problem when ADC channels have a different ranges.
     Typical use-case is when both single-ended and differential channels are in use. I suggest to use unique min/max definitions
     for each enabled channel.
+
+**********************************************************************************************************************************************
+11.10.2023
+**********************************************************************************************************************************************
+At this point I'm giving up this half-assed approach of hacking the MCU_adc class of mcu.py. The abstractions are too messy to interface with.
+I'm switching to a custom temperature sensor implemented according to extras/adc_temperature.py. These abstractions and API's seem to be more 
+minimalistic and on-point than mcu.py(insert cursewords here...).
+**********************************************************************************************************************************************
+
+TODO:
+    Explain the dataflow from klippy.py:main() until my_sensor's has been intitialized:
+
+1.  klippy.py:298 main() parses input arguments that is called with "klippy.py" from a script or cmd line terminal.
+
+2.  klippy.py:390 main() Printer object is created/initialized with; 'main_reactor', a thread-like event-driven framework based on greenlet,
+    , 'bglogger', what I think is a background logger, and 'start_args', input arguments.
+
+3.  klippy.py:50 Printer object registers the callback '_connect' with main_reactor. Initializes 'objects' as an ordered dictionary (order
+    of insertion is static). Inits Gcode interface (to MCU) and webhooks (to external tools like mainsail/moonraker, octopi, etc).
+
+4.  klippy.py:391 main() calls printer.run.
+
+5.  klippy.py:210 Printer.run() captures the local system time with a call to time.time() (returns a float of current systime).
+    main 'reactor' is started. 
+
+6.  klippy.py:173 Printer._connect() callback registerd with the main Reactor gets called (invoked?) from somewhere. I suspect klipperscreen/mainsail via 
+    webhooks or something. _connected() calls Printer._read_config() and calls all 'klippy:connect' event handlers registered with 
+    Printer.register_event_handler().
+
+7.  klippy.py:138 Printer._read_config() inits the MCU object via mcu.add_printer_object().
+
+8.  mcu.py:583 MCU object initializes the mcu communication interface, and registers its event handlers in the main Printer object.
+    Among these the '_connect()' event handler is of particular interest.
+
+9.  mcu.py:775 MCU._connect() request MCU's current config, and sends current config if mcu is unconfigured. At this point the MCU object must
+    have had its _config_callbacks registered, so when are they registered?
+
+    Most "modules" use the function MCU.setup_pin() to create an MCU subclass of _adc, _pwm, or _digital_out, based on pin_type. 
+    These subclasses will call MCU.register_config_callback() in their __init__() function. This callback is responsible for calling 
+    MCU.create_oid(), MCU.add_config_cmd(), MCU.get_query_slot() (synchronization object?), and MCU.register_response()(wrapper for 
+    Printer._serial.register_response()). 
+
+    Why are gpios used as abstractions for circuits that are far more complex than what a single gpio can represent.
+    And why use this broken abstraction as a core program state when initializing the MCU? 
+    If I need to init a gpio as part of a device's init that's a valid program state, but the converse is not true.
+
+10. I think at this we have completed the tasks required bystep 7 and 9. The MCU should now be ready for the regular printer commands
+    issued by the Klippy-host.
+
+This is valid for MCU_adc and similar classes, but there's still some questions. Like what are sensor factories? And are 'heaters' used?
+

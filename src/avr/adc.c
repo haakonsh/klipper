@@ -42,15 +42,18 @@ DECL_ENUMERATION_RANGE("pin", "PE2", GPIO('E', 2), 2);
 enum { ADMUX_DEFAULT = 0x40 };
 enum { ADC_ENABLE = (1<<ADPS0)|(1<<ADPS1)|(1<<ADPS2)|(1<<ADEN)|(1<<ADIF) };
 
-//TODO: What is this constant used for?
+// What is this constant used for?
 // ADC_MAX and _MIN is used to verify that an analog sensor is within range. F.ex min and max temperatures.
 // Set min/max to minimum and maximum values a single ADC sample can have: 10bit sign-extended to 16-bit = +2^10-1 to -2^10
-DECL_CONSTANT("ADC_MAX", 511);
-DECL_CONSTANT("ADC_MIN", -512);
+// TODO: Create unique sets of min/max values for the heater and hotend ADC channels.
+DECL_CONSTANT("ADC_MAX_HOTEND", 511);
+DECL_CONSTANT("ADC_MIN_HOTEND", -512);
+DECL_CONSTANT("ADC_MAX_BED", 1023);
+DECL_CONSTANT("ADC_MIN_BED", 0);
 
 //TODO: Configure ADC accordingly
 struct gpio_adc
-gpio_adc_setup(uint8_t admux)
+gpio_adc_setup(uint8_t adcsra, uint8_t adcsrb, uint8_t admux, uint8_t didr0, uint8_t didr2)
 {
     // Find pin in adc_pins table
     struct gpio_adc adc_cfg;
@@ -59,26 +62,21 @@ gpio_adc_setup(uint8_t admux)
     if (admux >= 0b111110)
         shutdown("Not a valid ADC input channel");
 
-    adc_cfg.admux = admux;
-    adc_cfg.adcsrb = (admux & (1 << 5));
-    output("adc_cfg.admux=%c", adc_cfg.admux);
+    adc_cfg.adcsra  = adcsra;
+    adc_cfg.adcsrb  = adcsrb;
+    adc_cfg.admux   = admux;
+    adc_cfg.didr0   = didr0;
+    adc_cfg.didr2   = didr2;
+    output("adc_cfg.adcsra=%c, adc_cfg.adcsrb=%c, adc_cfg.admux=%c, adc_cfg.didr0=%c, adc_cfg.didr2=%c", \
+            adc_cfg.adcsra, adc_cfg.adcsrb, adc_cfg.admux, adc_cfg.didr0, adc_cfg.didr2);
 
     // Enable ADC
-    adc_cfg.adcsra = ADC_ENABLE;
     ADCSRA = adc_cfg.adcsra;
 
-    // Disable digital input for this pin
-    if (adc_cfg.admux >= 0b100000)
-        adc_cfg.didr2 = 1 << (adc_cfg.admux & 0x07);
-    else if(adc_cfg.admux & (0b001001))
-        adc_cfg.didr0 = (1 << 0) | (1 << 1);
-    else
-        adc_cfg.didr0 = 1 << (adc_cfg.admux & 0x07);
-
+    // Disable digital input buffers for this channel
     DIDR0 |= adc_cfg.didr0;
     DIDR2 |= adc_cfg.didr2;
 
-    adc_cfg.admux |= ADMUX_DEFAULT;    
     return adc_cfg;
 }
 

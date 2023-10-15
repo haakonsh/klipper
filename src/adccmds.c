@@ -77,7 +77,7 @@ void command_config_analog_in(uint32_t *args)
     a->adc_cfg = adc_cfg;
     a->state = 1;
 }
-DECL_COMMAND(command_config_analog_in, "config_analog_in oid=%c admux=%u");
+DECL_COMMAND(command_config_analog_in, "config_analog_in oid=%c adcsra=%u adcsrb=%u admux=%u didr0=%u didr2=%u");
 
 void command_query_analog_in(uint32_t *args)
 {
