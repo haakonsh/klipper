@@ -156,4 +156,5 @@ This is valid for MCU_adc and similar classes, but there's still some questions.
     PrinterHeaters.setup_heater(). toolhead.py:605 add_printer_objects() calls kinematics/extruder.py's add_printer_objects().
     And toolhead.add_printer_objects() is called by klippy.py:142 Printer._read_config().
 
-    
+Do I need to use both MCU.register_config_callback(PrinterADCtoTemperatureAVR._build_config) and 
+ PrinterHeaters.add_sensor_factory(PrinterADCtoTemperatureAVR.name, PrinterADCtoTemperatureAVR.create) ?
