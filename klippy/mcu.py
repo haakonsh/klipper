@@ -503,7 +503,7 @@ class MCU_adc:
     def get_mcu(self):
         return self._mcu
     def setup_minmax(self, sample_time, sample_count,
-                     minval=-1., maxval=1., range_check_count=0):
+                     minval=0., maxval=1., range_check_count=0):
         self._sample_time = sample_time
         self._sample_count = sample_count
         self._min_sample = minval
@@ -518,42 +518,17 @@ class MCU_adc:
         if not self._sample_count:
             return
         self._oid = self._mcu.create_oid()
-        self._mcu.add_config_cmd("config_analog_in oid=%d admux=%s" % (
+        self._mcu.add_config_cmd("config_analog_in oid=%d pin=%s" % (
             self._oid, self._pin))
         clock = self._mcu.get_query_slot(self._oid)
         sample_ticks = self._mcu.seconds_to_clock(self._sample_time)
-
-        #TODO: Use different min/max values depending on ADC channel(pin)
-        if(self._pin == 0):
-            mcu_adc_max = self._mcu.get_constant_float("ADC_MAX_HOTEND")
-            mcu_adc_min = self._mcu.get_constant_float("ADC_MIN_HOTEND")
-            max_adc = self._sample_count * mcu_adc_max
-            min_adc = self._sample_count * mcu_adc_min
-
-            min_sample = max(int(-0x8000), min(0, math.floor(self._min_sample * min_adc))) #TODO: Set min adc vals
-            max_sample = min(0, min(int(0x7fff), math.ceil(self._max_sample * max_adc)))
-
-        elif(self._pin == 2):
-            mcu_adc_max = self._mcu.get_constant_float("ADC_MAX_BED")
-            mcu_adc_min = self._mcu.get_constant_float("ADC_MIN_BED")
-            max_adc = self._sample_count * mcu_adc_max
-            min_adc = self._sample_count * mcu_adc_min
-
-            min_sample = max(0, min(0, math.floor(self._min_sample * min_adc))) #TODO: Set min adc vals
-            max_sample = min(0, min(int(0xffff), math.ceil(self._max_sample * max_adc)))
-
-        else:
-            logging.info("Error! Cannot configure MIN/MAX values. Incorrect admux/pin number: %s", self._pin)
-            mcu_adc_min = 1
-            mcu_adc_max = 1
-            max_adc = 1
-            min_adc = 1
-            min_sample = 1
-            max_sample = 1
-
+        mcu_adc_max = self._mcu.get_constant_float("ADC_MAX")
+        max_adc = self._sample_count * mcu_adc_max
         self._inv_max_adc = 1.0 / max_adc
-        self._inv_min_adc = 1.0 / min_adc
         self._report_clock = self._mcu.seconds_to_clock(self._report_time)
+        min_sample = max(0, min(0xffff, int(self._min_sample * max_adc)))
+        max_sample = max(0, min(0xffff, int(
+            math.ceil(self._max_sample * max_adc))))
         self._mcu.add_config_cmd(
             "query_analog_in oid=%d clock=%d sample_ticks=%d sample_count=%d"
             " rest_ticks=%d min_value=%d max_value=%d range_check_count=%d" % (
@@ -563,11 +538,7 @@ class MCU_adc:
         self._mcu.register_response(self._handle_analog_in_state,
                                     "analog_in_state", self._oid)
     def _handle_analog_in_state(self, params):
-        # logging.info("Type of adc value passed to _handle_analog_in_state:")
-        # logging.info(type(params['value']))
-        # logging.info("ADC value passed to _handle_analog_in_state: ")
-        # logging.info(params['value'])
-        last_value = params['value'] * self._inv_max_adc        #TODO: Do I need to sign-convert samples on MCU side?
+        last_value = params['value'] * self._inv_max_adc
         next_clock = self._mcu.clock32_to_clock64(params['next_clock'])
         last_read_clock = next_clock - self._report_clock
         last_read_time = self._mcu.clock_to_print_time(last_read_clock)
