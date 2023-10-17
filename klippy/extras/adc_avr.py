@@ -5,7 +5,7 @@
 # This file may be distributed under the terms of the GNU GPLv3 license.
 
 import logging, bisect, mcu, math
-from thermistor import Thermistor
+from .thermistor import Thermistor
 
 ######################################################################
 # Interface between MCU adc and heater temperature callbacks
@@ -20,7 +20,7 @@ RANGE_CHECK_COUNT = 4
 class PrinterADCtoTemperatureAVR:
     def __init__(self, config):
         self.printer = config.get_printer()
-        self._mcu = mcu.get_printer_mcu(self.printer, config.get('mcu'))
+        self._mcu = mcu.get_printer_mcu(self.printer, 'mcu')
         # Get configs. Should I iterate over all 'names'/'sections' and register callbacks and stuff here? 
         # Or should I create a new PrinterADCtoTemperatureAVR object for each 'name'?       
         self.name   = config.get_name()
@@ -37,7 +37,7 @@ class PrinterADCtoTemperatureAVR:
         self._last_value = 0
         self._single_ended = False
 
-        self._mcu.register_config_callback(self._build_config)
+        self._mcu.register_config_callback(self._build_config(config))
         # If any error occurs during config: raise config.error("my error")
 
         # Setup adc channel
@@ -45,7 +45,7 @@ class PrinterADCtoTemperatureAVR:
         # Initialize variables from config, then register commands.
         if not self._sample_count:
             return
-        self._oid = self.printer.create_oid()
+        self._oid = self._mcu.create_oid()
 
         #TODO: Use different min/max values for single-ended and differential inputs
         if((self._admux < (64+8)) and (self._admux > (64+29))): # Single-ended
@@ -64,11 +64,11 @@ class PrinterADCtoTemperatureAVR:
             self.adc_accumulated_max = self._sample_count * adc_sample_max
             self.adc_accumulated_min = self._sample_count * adc_sample_min
 
-            self.adc_accumulated_min = max(int(-0x8000), min(0, math.floor(self.adc_accumulated_min)))
-            self.adc_accumulated_max = min(0, min(int(0x7fff), math.ceil(self.adc_accumulated_max))) 
+            self.adc_accumulated_min = max(int(-0x8000), min(0.0001, math.floor(self.adc_accumulated_min)))
+            self.adc_accumulated_max = min(0.0001, min(int(0x7fff), math.ceil(self.adc_accumulated_max))) 
 
         else:
-            logging.info("Error! Cannot configure MIN/MAX values. Incorrect admux value: %s", self._admux)
+            raise config.error("Error! Cannot configure MIN/MAX values. Incorrect admux value")
             mcu_adc_min = 1
             mcu_adc_max = 1
             self.adc_accumulated_max = 1
@@ -147,7 +147,7 @@ class PT1000_WheatStone(PrinterADCtoTemperatureAVR):
         return temp
     
     def calc_adc(self, temp): # Convert temperature to ADC value  
-        # return adc
+        return 0.0
 
 class BedTempMK3S(PrinterADCtoTemperatureAVR, Thermistor):
     def __init__(self, config):
