@@ -36,7 +36,7 @@ struct gpio_adc {
     uint8_t didr0;
     uint8_t didr2;
 };
-struct gpio_adc gpio_adc_setup(uint8_t admux); //TODO: Change parameter to admux. Done!
+struct gpio_adc gpio_adc_setup(uint8_t adcsra, uint8_t adcsrb, uint8_t admux, uint8_t didr0, uint8_t didr2); //TODO: Change parameter to admux. Done!
 uint32_t gpio_adc_sample(struct gpio_adc g);
 int16_t gpio_adc_read(struct gpio_adc g); //TODO: Change return type from uint16_t to int16_t. Done!
 void gpio_adc_cancel_sample(struct gpio_adc g);

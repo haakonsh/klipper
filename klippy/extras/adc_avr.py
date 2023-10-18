@@ -4,7 +4,7 @@
 #
 # This file may be distributed under the terms of the GNU GPLv3 license.
 
-import logging, bisect, mcu, math
+import logging, bisect, mcu, math, msgproto, serialhdl
 from .thermistor import Thermistor
 
 ######################################################################
@@ -36,31 +36,35 @@ class PrinterADCtoTemperatureAVR:
         self._range_check_count = RANGE_CHECK_COUNT
         self._last_value = 0
         self._single_ended = False
+        self._config_error = config.error
 
-        self._mcu.register_config_callback(self._build_config(config))
+        self._mcu.register_config_callback(self._build_config)
         # If any error occurs during config: raise config.error("my error")
 
         # Setup adc channel
-    def _build_config(self, config):
+    def _build_config(self):
         # Initialize variables from config, then register commands.
         if not self._sample_count:
             return
         self._oid = self._mcu.create_oid()
 
+        mcu_constants = self._mcu._get_status_info['mcu_constants']
+        print(mcu_constants['ADC_MAX_SINGLE_ENDED'])
+
         #TODO: Use different min/max values for single-ended and differential inputs
-        if((self._admux < (64+8)) and (self._admux > (64+29))): # Single-ended
+        if((self._admux < (64+8)) or (self._admux > (64+29))): # Single-ended
             self._single_ended = True
-            adc_sample_max = self.printer.get_constant_float("ADC_MAX_SINGLE_ENDED")
-            adc_sample_min = self.printer.get_constant_float("ADC_MIN_SINGLE_ENDED")
+            adc_sample_max = self._mcu._serial.get_msgparser().get_constant_int("ADC_MAX_SINGLE_ENDED")
+            adc_sample_min = self._mcu._serial.get_msgparser().get_constant_int("ADC_MIN_SINGLE_ENDED")
             self.adc_accumulated_max = self._sample_count * adc_sample_max
             self.adc_accumulated_min = self._sample_count * adc_sample_min
 
-            self.adc_accumulated_min = max(0, min(0, math.floor(self.adc_accumulated_min)))
-            self.adc_accumulated_max = min(0, min(int(0xffff), math.ceil(self.adc_accumulated_max)))
+            self.adc_accumulated_min = max(0, math.floor(self.adc_accumulated_min))
+            self.adc_accumulated_max = min(int(0xffff), math.ceil(self.adc_accumulated_max))
 
         elif((self._admux > (64+7)) and (self._admux < (64+30))): # Differential
-            adc_sample_max = self.printer.get_constant_float("ADC_MAX_BED")
-            adc_sample_min = self.printer.get_constant_float("ADC_MIN_BED")
+            adc_sample_max = self._mcu._serial.get_msgparser().get_constant_int("ADC_MAX_DIFFERENTIAL")
+            adc_sample_min = self._mcu._serial.get_msgparser().get_constant_int("ADC_MIN_DIFFERENTIAL")
             self.adc_accumulated_max = self._sample_count * adc_sample_max
             self.adc_accumulated_min = self._sample_count * adc_sample_min
 
@@ -68,7 +72,7 @@ class PrinterADCtoTemperatureAVR:
             self.adc_accumulated_max = min(0.0001, min(int(0x7fff), math.ceil(self.adc_accumulated_max))) 
 
         else:
-            raise config.error("Error! Cannot configure MIN/MAX values. Incorrect admux value")
+            raise self._config_error('Error! Cannot configure MIN/MAX values. Incorrect admux value: %s' % self._admux)
             mcu_adc_min = 1
             mcu_adc_max = 1
             self.adc_accumulated_max = 1
@@ -77,21 +81,20 @@ class PrinterADCtoTemperatureAVR:
             max_sample = 1
 
         self._normalization_vector = 1.0 /(self.adc_accumulated_max - self.adc_accumulated_min)
-
-        self.printer.add_config_cmd("config_analog_in oid=%d adcsra=%s adcsrb=%s admux=%s didr0=%s didr2=%s" % (
+        self._mcu.add_config_cmd("config_analog_in oid=%d adcsra=%d adcsrb=%d admux=%d didr0=%d didr2=%d" % (
             self._oid, self._adcsra, self._adcsrb, self._admux, self._didr0, self._didr2))
-        clock = self.printer.get_query_slot(self._oid)
-        sample_ticks = self.printer.seconds_to_clock(self._sample_time)        
-        self._report_clock = self.printer.seconds_to_clock(self._report_time)
-
-        self.printer.add_config_cmd(
+        
+        clock = self._mcu.get_query_slot(self._oid)
+        sample_ticks = self._mcu.seconds_to_clock(self._sample_time)        
+        self._report_clock = self._mcu.seconds_to_clock(self._report_time)
+        self._mcu.add_config_cmd(
             "query_analog_in oid=%d clock=%d sample_ticks=%d sample_count=%d"
             " rest_ticks=%d min_value=%d max_value=%d range_check_count=%d" % (
                 self._oid, clock, sample_ticks, self._sample_count,
                 self._report_clock, self.adc_accumulated_min, self.adc_accumulated_max,
                 self._range_check_count), is_init=True)
         
-        self.printer.register_response(self._handle_analog_in_state,
+        self._mcu.register_response(self._handle_analog_in_state,
                                     "analog_in_state", self._oid)
  
     def setup_minmax(self, min_temp, max_temp):

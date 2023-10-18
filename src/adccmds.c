@@ -70,7 +70,7 @@ analog_in_event(struct timer *timer)
 
 void command_config_analog_in(uint32_t *args)
 {
-    struct gpio_adc adc_cfg = gpio_adc_setup(args[1]);
+    struct gpio_adc adc_cfg = gpio_adc_setup(args[1], args[2], args[3], args[4], args[5]);
     struct analog_in *a = oid_alloc(
         args[0], command_config_analog_in, sizeof(*a));
     a->timer.func = analog_in_event;

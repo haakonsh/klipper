@@ -46,10 +46,10 @@ enum { ADC_ENABLE = (1<<ADPS0)|(1<<ADPS1)|(1<<ADPS2)|(1<<ADEN)|(1<<ADIF) };
 // ADC_MAX and _MIN is used to verify that an analog sensor is within range. F.ex min and max temperatures.
 // Set min/max to minimum and maximum values a single ADC sample can have: 10bit sign-extended to 16-bit = +2^10-1 to -2^10
 // TODO: Create unique sets of min/max values for the heater and hotend ADC channels.
-DECL_CONSTANT("ADC_MAX_HOTEND", 511);
-DECL_CONSTANT("ADC_MIN_HOTEND", -512);
-DECL_CONSTANT("ADC_MAX_BED", 1023);
-DECL_CONSTANT("ADC_MIN_BED", 0);
+DECL_CONSTANT("ADC_MAX_DIFFERENTIAL", 511);
+DECL_CONSTANT("ADC_MIN_DIFFERENTIAL", -512);
+DECL_CONSTANT("ADC_MAX_SINGLE_ENDED", 1023);
+DECL_CONSTANT("ADC_MIN_SINGLE_ENDED", 0);
 
 //TODO: Configure ADC accordingly
 struct gpio_adc
