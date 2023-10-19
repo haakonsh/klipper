@@ -45,6 +45,10 @@ analog_in_event(struct timer *timer)
     }
     a->value = value;
     a->state = state + 1;
+    
+    // if(a->adc_cfg.mux == 0x9)output("mux:%c differential:%c value:%hi",a->adc_cfg.mux ,a->adc_cfg.differential_inputs, a->value);
+    output("mux:%c differential:%c value:%hi",a->adc_cfg.mux ,a->adc_cfg.differential_inputs, a->value);
+
     if (a->state < a->sample_count)
     {
         a->timer.waketime += a->sample_time;
@@ -96,9 +100,9 @@ void command_query_analog_in(uint32_t *args)
     a->min_value = args[5];
     a->max_value = args[6];
     a->range_check_count = args[7];
-    output("a->adc_cfg.admux=%c", a->adc_cfg.admux);
-    output("a->min_value=%hi", a->min_value);
-    output("a->max_value=%hi", a->max_value);
+    // output("a->adc_cfg.admux=%c", a->adc_cfg.admux);
+    // output("a->min_value=%hi", a->min_value);
+    // output("a->max_value=%hi", a->max_value);
     if (!a->sample_count)
         return;
     sched_add_timer(&a->timer);
@@ -124,33 +128,34 @@ void analog_in_task(void)
             continue;
         }
         int16_t value = a->value; //TODO: Change to int? Done!
-        uint8_t mux = a->adc_cfg.mux;
-        if(mux == 2)
-        {
-            static uint16_t counter = 1;
-            static int16_t accumulator = 0;
-            int16_t average = 0;
-            accumulator += value;
-            if(!(counter % 64))
-            {
-                average = accumulator/64;
-                output("mux=%c", mux);
-                output("Average ADC offset = %hi", average);
-                accumulator = 0;
-            }
-            counter++;        
-        }
+        // if(a->adc_cfg.mux == 0x9)output("mux: %c value:%hi[int16_t]", a->adc_cfg.mux , value);
+        output("mux:%c differential:%c value:%hi",a->adc_cfg.mux ,a->adc_cfg.differential_inputs, a->value);
+        // uint8_t mux = a->adc_cfg.mux;
+        // if(mux == 2)
+        // {
+        //     static uint16_t counter = 1;
+        //     static int16_t accumulator = 0;
+        //     int16_t average = 0;
+        //     accumulator += value;
+        //     if(!(counter % 64))
+        //     {
+        //         average = accumulator/64;
+        //         output("Average offset on ADC channel %c is %hi codes", mux, average);
+        //         accumulator = 0;
+        //     }
+        //     counter++;        
+        // }
             
         uint32_t next_begin_time = a->next_begin_time;
         a->state++;
-        if(mux == 2)
-        {
-            //value += 10;
-            // if(value < 0) value = 0;
-        }
+        // if(mux == 2)
+        // {
+        //     //value += 10;
+        //     // if(value < 0) value = 0;
+        // }
         irq_enable();
-        output("mux=%c", mux);
-        output("value=%hi", value);
+        // output("mux=%c", mux);
+        // output("value=%hi", value);
         sendf("analog_in_state oid=%c next_clock=%u value=%hi", oid, next_begin_time, value);
     }
 }

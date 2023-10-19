@@ -53,7 +53,7 @@ DECL_CONSTANT("ADC_MIN_SINGLE_ENDED", 0);
 
 //0b001000 - 0b011111, 0b101000 - 0b111101  Diff
 //0b000000 - 0b000111, 0b100000 - 0b100111  Single
-enum { ADC_DIFF_MASK=0b01100000 }; 
+enum { ADC_DIFF_MASK=0b00011000 }; 
 
 //TODO: Configure ADC accordingly
 struct gpio_adc
@@ -70,6 +70,7 @@ gpio_adc_setup(uint8_t adcsra, uint8_t adcsrb, uint8_t admux, uint8_t didr0, uin
     adc_cfg.didr0   = didr0;
     adc_cfg.didr2   = didr2;
     adc_cfg.mux     = (adc_cfg.admux & 0b11111) | ((adc_cfg.adcsrb & 0b1000) << 2);
+    // output("adc_cfg.mux(%c) & ADC_DIFF_MASK(%c) = %c", adc_cfg.mux, ADC_DIFF_MASK, (adc_cfg.mux & ADC_DIFF_MASK));
     if(adc_cfg.mux & ADC_DIFF_MASK)
     {
         adc_cfg.differential_inputs = 1;
@@ -81,8 +82,9 @@ gpio_adc_setup(uint8_t adcsra, uint8_t adcsrb, uint8_t admux, uint8_t didr0, uin
     adc_cfg.differential_settled = 0;
     adc_cfg.running = 0;
 
-    output("adc_cfg.adcsra=%c, adc_cfg.adcsrb=%c, adc_cfg.admux=%c, adc_cfg.didr0=%c, adc_cfg.didr2=%c", \
-            adc_cfg.adcsra, adc_cfg.adcsrb, adc_cfg.admux, adc_cfg.didr0, adc_cfg.didr2);
+    output(".adcsra:%c, .adcsrb:%c, .admux:%c, .didr0:%c, .didr2:%c, .mux:%c, .differential_input:%c",   \
+            adc_cfg.adcsra, adc_cfg.adcsrb, adc_cfg.admux, adc_cfg.didr0, adc_cfg.didr2,        \
+            adc_cfg.mux, adc_cfg.differential_inputs);
             
     if ((adc_cfg.mux & 0b00011110) == 0b00011110) // Vbg, Vgnd, or one of the two reserved channels.
         shutdown("Not a valid ADC input channel");
@@ -157,12 +159,19 @@ int16_t
 gpio_adc_read(struct gpio_adc g)
 {
     last_analog_read = ADC_DUMMY;
-    if(ADC & 0x200)   // Check the sign bit (10th)
+
+    if(!g.differential_inputs)
+    {
+        return ADC;
+    }
+    else if(ADC & 0x200)   // Check the sign bit (10th)
     {        
         return ADC | 0xFC00; // Pad 1's (two's complement)
     }
-
-    return ADC;                     
+    else
+    {
+        return ADC;
+    }
 }
 
 // Cancel a sample that may have been started with gpio_adc_sample()

@@ -115,9 +115,13 @@ class PrinterADCtoTemperatureAVR:
         # logging.info(type(params['value']))
         # logging.info("ADC value passed to _handle_analog_in_state: ")
         # logging.info(params['value'])
-
+        if(self.name == 'extruder'):
+            print("Raw ADC codes from '%-11s': %.3f" % (self.name, params['value']))
+        
         # Normalize the raw ADC value (0.0 to 1.0). Thermistor.calc_temp() requirement.
-        self._last_value = self.calc_temp(self._normalization_vector * params['value'])
+        self._last_value = self.calc_temp(params['value'])
+        # print("calc_temp from '%s': %.3f" % (self.name, self._last_value))
+
         # Need to convert the accumulated ADC codes to temperature[C]. What format?
         next_clock = self._mcu.clock32_to_clock64(params['next_clock'])
         last_read_clock = next_clock - self._report_clock
@@ -138,9 +142,15 @@ class PT1000_WheatStone(PrinterADCtoTemperatureAVR):
         self._alpha = config.getfloat('alpha', 3.85055, above=0.)
         self._reference_resistor_voltage = self._vref * (self._reference_resistor/(self._reference_resistor + self._reference_pullup_resistor))
         
-    def calc_temp(self, differential_voltage): # Convert ADC value to temperature
-        # Find the voltage across the PT1000 sensor, 'differential_voltage' is normalized to a unit vector of 1
-        pt1000_voltage = (self._reference_resistor_voltage * self._normalization_vector) + differential_voltage
+    def calc_temp(self, raw_adc): # Convert ADC value to temperature
+        
+        # Normalize the raw ADC value (0.0 to 1.0). Thermistor.calc_temp() requirement.
+        adc_normalized = self._normalization_vector * raw_adc
+        # print("Raw ADC codes from '%s' after normalization: %.3f" % (self.name, adc_normalized))
+
+        # Find the voltage across the PT1000 sensor, 'adc_normalized' is normalized to a unit vector of 1
+        pt1000_voltage = (self._reference_resistor_voltage * self._normalization_vector) + adc_normalized
+        # print("PT1000 voltage from '%s': %.3f" % (self.name, pt1000_voltage))
         
         # Find the resistance of the PT1000 sensor based on its measured voltage and the wheatstone parameters
         pt1000_resistance =  ((pt1000_voltage/self._vref)*self._pt1000_pullup_resistor)/(1-(pt1000_voltage/self._vref))
@@ -156,17 +166,22 @@ class BedTempMK3S(PrinterADCtoTemperatureAVR, Thermistor):
     def __init__(self, config):
         PrinterADCtoTemperatureAVR.__init__(self, config)
 
-        Thermistor.__init__(self, 
-                            config.getfloat('pullup_resistor', 4700., above=0.), 
-                            config.getfloat('inline_resistor', 0., minval=0.))
+        self.thermistor = Thermistor(config.getfloat('pullup_resistor', 4700., above=0.),
+                                     config.getfloat('inline_resistor', 0., minval=0.))
         
-        self.setup_coefficients(t1=config.getfloat('t1', 0., above=0.), 
+        self.thermistor.setup_coefficients(t1=config.getfloat('t1', 0., above=0.), 
                                 r1=config.getfloat('r1', 0., above=0.),
                                 t2=config.getfloat('t2', 0., above=0.),
                                 r2=config.getfloat('r2', 0., above=0.),
                                 t3=config.getfloat('t3', 0., above=0.),
                                 r3=config.getfloat('r3', 0., above=0.),
                                 name=config.get_name())
+    def calc_temp(self, raw_adc):
+        # Normalize the raw ADC value (0.0 to 1.0). Thermistor.calc_temp() requirement.
+        adc_normalized = self._normalization_vector * raw_adc
+        # print("Raw ADC codes from '%s' after normalization: %.3f" % (self.name, adc_normalized))
+
+        return self.thermistor.calc_temp(adc_normalized)
 
 Sensors = {
     "hotend_temp": PT1000_WheatStone,

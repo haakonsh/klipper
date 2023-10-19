@@ -158,3 +158,9 @@ This is valid for MCU_adc and similar classes, but there's still some questions.
 
 Do I need to use both MCU.register_config_callback(PrinterADCtoTemperatureAVR._build_config) and 
  PrinterHeaters.add_sensor_factory(PrinterADCtoTemperatureAVR.name, PrinterADCtoTemperatureAVR.create) ?
+
+
+
+19.10.2023: Why the fuck are they using variable length data types embedded in strings, on an 8-bit AVR? Python already supports binary data types...
+
+19.10.2023: diff inputs are not sampling, I suspect the unchecked 125µs settling delay is ignored by the other ADC channel.
