@@ -26,6 +26,7 @@ static uint_fast8_t
 analog_in_event(struct timer *timer)
 {
     struct analog_in *a = container_of(timer, struct analog_in, timer);
+    // Check if ADC has been configured correctly already
     uint32_t sample_delay = gpio_adc_sample(a->adc_cfg);
     if (sample_delay)
     {
@@ -49,6 +50,8 @@ analog_in_event(struct timer *timer)
         a->timer.waketime += a->sample_time;
         return SF_RESCHEDULE;
     }
+    a->adc_cfg.running = 0;
+    a->adc_cfg.differential_settled = 0;
 
     if (likely(a->value >= a->min_value && a->value <= a->max_value))
     {
@@ -77,7 +80,7 @@ void command_config_analog_in(uint32_t *args)
     a->adc_cfg = adc_cfg;
     a->state = 1;
 }
-DECL_COMMAND(command_config_analog_in, "config_analog_in oid=%c adcsra=%u adcsrb=%u admux=%u didr0=%u didr2=%u");
+DECL_COMMAND(command_config_analog_in, "config_analog_in oid=%c adcsra=%c adcsrb=%c admux=%c didr0=%c didr2=%c");
 
 void command_query_analog_in(uint32_t *args)
 {
@@ -121,8 +124,8 @@ void analog_in_task(void)
             continue;
         }
         int16_t value = a->value; //TODO: Change to int? Done!
-        uint8_t admux = a->adc_cfg.admux - 0x40;
-        if(admux == 2)
+        uint8_t mux = a->adc_cfg.mux;
+        if(mux == 2)
         {
             static uint16_t counter = 1;
             static int16_t accumulator = 0;
@@ -131,7 +134,7 @@ void analog_in_task(void)
             if(!(counter % 64))
             {
                 average = accumulator/64;
-                output("admux=%c", admux);
+                output("mux=%c", mux);
                 output("Average ADC offset = %hi", average);
                 accumulator = 0;
             }
@@ -140,13 +143,13 @@ void analog_in_task(void)
             
         uint32_t next_begin_time = a->next_begin_time;
         a->state++;
-        if(admux == 2)
+        if(mux == 2)
         {
-            value += 10;
+            //value += 10;
             // if(value < 0) value = 0;
         }
         irq_enable();
-        output("admux=%c", admux);
+        output("mux=%c", mux);
         output("value=%hi", value);
         sendf("analog_in_state oid=%c next_clock=%u value=%hi", oid, next_begin_time, value);
     }

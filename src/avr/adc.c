@@ -51,6 +51,10 @@ DECL_CONSTANT("ADC_MIN_DIFFERENTIAL", -512);
 DECL_CONSTANT("ADC_MAX_SINGLE_ENDED", 1023);
 DECL_CONSTANT("ADC_MIN_SINGLE_ENDED", 0);
 
+//0b001000 - 0b011111, 0b101000 - 0b111101  Diff
+//0b000000 - 0b000111, 0b100000 - 0b100111  Single
+enum { ADC_DIFF_MASK=0b01100000 }; 
+
 //TODO: Configure ADC accordingly
 struct gpio_adc
 gpio_adc_setup(uint8_t adcsra, uint8_t adcsrb, uint8_t admux, uint8_t didr0, uint8_t didr2)
@@ -59,16 +63,29 @@ gpio_adc_setup(uint8_t adcsra, uint8_t adcsrb, uint8_t admux, uint8_t didr0, uin
     struct gpio_adc adc_cfg;
     memset(&adc_cfg, 0x00, sizeof(adc_cfg));
 
-    if (admux >= 0b111110)
-        shutdown("Not a valid ADC input channel");
 
     adc_cfg.adcsra  = adcsra;
     adc_cfg.adcsrb  = adcsrb;
     adc_cfg.admux   = admux;
     adc_cfg.didr0   = didr0;
     adc_cfg.didr2   = didr2;
+    adc_cfg.mux     = (adc_cfg.admux & 0b11111) | ((adc_cfg.adcsrb & 0b1000) << 2);
+    if(adc_cfg.mux & ADC_DIFF_MASK)
+    {
+        adc_cfg.differential_inputs = 1;
+    }
+    else
+    {
+        adc_cfg.differential_inputs = 0;
+    }
+    adc_cfg.differential_settled = 0;
+    adc_cfg.running = 0;
+
     output("adc_cfg.adcsra=%c, adc_cfg.adcsrb=%c, adc_cfg.admux=%c, adc_cfg.didr0=%c, adc_cfg.didr2=%c", \
             adc_cfg.adcsra, adc_cfg.adcsrb, adc_cfg.admux, adc_cfg.didr0, adc_cfg.didr2);
+            
+    if ((adc_cfg.mux & 0b00011110) == 0b00011110) // Vbg, Vgnd, or one of the two reserved channels.
+        shutdown("Not a valid ADC input channel");
 
     // Enable ADC
     ADCSRA = adc_cfg.adcsra;
@@ -81,6 +98,8 @@ gpio_adc_setup(uint8_t adcsra, uint8_t adcsrb, uint8_t admux, uint8_t didr0, uin
 }
 
 enum { ADC_DUMMY=0xff };
+
+
 static uint8_t last_analog_read = ADC_DUMMY;
 
 //TODO: Configure ADC accordingly. Done!
@@ -93,24 +112,42 @@ gpio_adc_sample(struct gpio_adc g)
     if (ADCSRA & (1<<ADSC))
         // Busy
         goto need_delay;
-    if (last_analog_read == g.admux)
+    if (last_analog_read == g.mux)
         // Sample now ready
         return 0;
     if (last_analog_read != ADC_DUMMY)
         // Sample on another channel in progress
         goto need_delay;
-    last_analog_read = g.admux;
 
-    // Set the channel to sample
-    ADCSRB = g.adcsrb;
-    ADMUX = g.admux;
+    if(!g.running)
+    {
+        // Set the channel to sample
+        ADCSRB = g.adcsrb;
+        ADMUX = g.admux;
+    }
     //output("ADMUX=%c ADCSRA=%c ADCSRB=%c DIDR0=%c DIDR1=%c DIDR2=%c", ADMUX, ADCSRA, ADCSRB, DIDR0, DIDR1, DIDR2);    
-    // Start the sample
-    ADCSRA = ADC_ENABLE | (1<<ADSC);
 
+    // Differential channels need 125µs before the first conversion can be triggered.
+    if(g.differential_inputs && (!g.differential_settled))
+    {
+        g.differential_settled = 1;
+        return 2000;    // 2000/16MHz = 125µs
+    } 
+    last_analog_read = g.mux;
+
+    // Start the sample
+    ADCSRA |= (1 << ADSC);
+    
+    // Schedule next attempt after sample is likely to be complete
+    if(!g.running)
+    {
+        g.running = 1;
+        return (25 + 1) * 128 + 200;    // First ADC conversion takes 25 ADC cycles = 208µs + 12.5µs  
+    }
     // Schedule next attempt after sample is likely to be complete
 need_delay:
-    return (13 + 1) * 128 + 200;
+    // ADC CLK = SYS CLK / ADC Prescaler = 16MHz/128 = 125kHz
+    return (13 + 1) * 128 + 200; // 14 ADC CLK * 128 ADC Prescaler + 200 SYS CLK = 1992 SYS CLK / 16MHz = 124.5µs
 }
 
 //TODO: Check the sign bit (10th) and pad bits accordingly. Done!
@@ -132,6 +169,8 @@ gpio_adc_read(struct gpio_adc g)
 void
 gpio_adc_cancel_sample(struct gpio_adc g)
 {
-    if (last_analog_read == g.admux)
+    if (last_analog_read == g.mux)
         last_analog_read = ADC_DUMMY;
+    g.running = 0;
+    g.differential_settled = 0;
 }
