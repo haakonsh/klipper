@@ -103,8 +103,9 @@ enum { ADC_DUMMY=0xff };
 
 
 static uint8_t last_analog_read = ADC_DUMMY;
+static uint8_t settling = 0;
 
-//TODO: Configure ADC accordingly. Done!
+
 // Try to sample a value. Returns zero if sample ready, otherwise
 // returns the number of clock ticks the caller should wait before
 // retrying this function.
@@ -120,6 +121,9 @@ gpio_adc_sample(struct gpio_adc g)
     if (last_analog_read != ADC_DUMMY)
         // Sample on another channel in progress
         goto need_delay;
+    if (settling && !g.differential_settled)
+        // ADC is settling before a diff input channel can begin to sample
+        goto need_delay;
 
     if(!g.running)
     {
@@ -132,9 +136,11 @@ gpio_adc_sample(struct gpio_adc g)
     // Differential channels need 125µs before the first conversion can be triggered.
     if(g.differential_inputs && (!g.differential_settled))
     {
+        settling = 1;
         g.differential_settled = 1;
         return 2000;    // 2000/16MHz = 125µs
     } 
+    settling = 0;
     last_analog_read = g.mux;
 
     // Start the sample

@@ -51,7 +51,7 @@ class PrinterADCtoTemperatureAVR:
         mcu_constants = self._mcu._get_status_info['mcu_constants']
         print(mcu_constants['ADC_MAX_SINGLE_ENDED'])
 
-        #TODO: Use different min/max values for single-ended and differential inputs
+        # Use different min/max values for single-ended and differential inputs
         if((self._admux < (64+8)) or (self._admux > (64+29))): # Single-ended
             self._single_ended = True
             adc_sample_max = self._mcu._serial.get_msgparser().get_constant_int("ADC_MAX_SINGLE_ENDED")
@@ -69,7 +69,7 @@ class PrinterADCtoTemperatureAVR:
             self.adc_accumulated_min = self._sample_count * adc_sample_min
 
             self.adc_accumulated_min = max(int(-0x8000), min(0.0001, math.floor(self.adc_accumulated_min)))
-            self.adc_accumulated_max = min(0.0001, min(int(0x7fff), math.ceil(self.adc_accumulated_max))) 
+            self.adc_accumulated_max = min(int(0x7fff), math.ceil(self.adc_accumulated_max))
 
         else:
             raise self._config_error('Error! Cannot configure MIN/MAX values. Incorrect admux value: %s' % self._admux)
@@ -80,18 +80,22 @@ class PrinterADCtoTemperatureAVR:
             min_sample = 1
             max_sample = 1
 
-        self._normalization_vector = 1.0 /(self.adc_accumulated_max - self.adc_accumulated_min)
+        self._normalization_vector = 1.0 /(self.adc_accumulated_max - self.adc_accumulated_min)       
+
         self._mcu.add_config_cmd("config_analog_in oid=%d adcsra=%d adcsrb=%d admux=%d didr0=%d didr2=%d" % (
-            self._oid, self._adcsra, self._adcsrb, self._admux, self._didr0, self._didr2))
-        
+            self._oid, self._adcsra, self._adcsrb, self._admux, self._didr0, self._didr2))     
+
         clock = self._mcu.get_query_slot(self._oid)
         sample_ticks = self._mcu.seconds_to_clock(self._sample_time)        
         self._report_clock = self._mcu.seconds_to_clock(self._report_time)
+
+        self.adc_min = min(self.calc_adc(self._min_temp), self.calc_adc(self._max_temp))
+        self.adc_max = max(self.calc_adc(self._min_temp), self.calc_adc(self._max_temp))
         self._mcu.add_config_cmd(
             "query_analog_in oid=%d clock=%d sample_ticks=%d sample_count=%d"
             " rest_ticks=%d min_value=%d max_value=%d range_check_count=%d" % (
                 self._oid, clock, sample_ticks, self._sample_count,
-                self._report_clock, self.adc_accumulated_min, self.adc_accumulated_max,
+                self._report_clock, self.adc_min, self.adc_max,
                 self._range_check_count), is_init=True)
         
         self._mcu.register_response(self._handle_analog_in_state,
@@ -99,7 +103,7 @@ class PrinterADCtoTemperatureAVR:
  
     def setup_minmax(self, min_temp, max_temp):
         self._min_temp = min_temp
-        self._max_temp = max_temp      
+        self._max_temp = max_temp  
 
     def get_report_time_delta(self):
         return self._report_time
@@ -159,8 +163,16 @@ class PT1000_WheatStone(PrinterADCtoTemperatureAVR):
         temp = (pt1000_resistance - self._r0)/self._alpha
         return temp
     
-    def calc_adc(self, temp): # Convert temperature to ADC value  
-        return 0.0
+    def calc_adc(self, temp): # Convert temperature to ADC value. Used to set min/max. Reverse of calc_temp()
+        
+        pt1000_resistance = (temp * self._alpha) + self._r0
+
+        pt1000_voltage = self._vref * (pt1000_resistance/(pt1000_resistance + self._pt1000_pullup_resistor))
+
+        vdiff = pt1000_voltage - self._reference_resistor_voltage
+
+        raw_adc = int(vdiff*10*(512/self._vref)*self._sample_count)
+        return raw_adc
 
 class BedTempMK3S(PrinterADCtoTemperatureAVR, Thermistor):
     def __init__(self, config):
@@ -180,8 +192,11 @@ class BedTempMK3S(PrinterADCtoTemperatureAVR, Thermistor):
         # Normalize the raw ADC value (0.0 to 1.0). Thermistor.calc_temp() requirement.
         adc_normalized = self._normalization_vector * raw_adc
         # print("Raw ADC codes from '%s' after normalization: %.3f" % (self.name, adc_normalized))
-
         return self.thermistor.calc_temp(adc_normalized)
+
+    def calc_adc(self, temp):# Convert temperature to ADC value. Used to set min/max. Reverse of calc_temp()   
+        raw_adc = int(self.thermistor.calc_adc(temp) * 1024 * self._sample_count)
+        return raw_adc
 
 Sensors = {
     "hotend_temp": PT1000_WheatStone,

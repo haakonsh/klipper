@@ -15,3 +15,5 @@ sudo klippy-env/bin/python klipper/klippy/klippy.py -v printer_data/config/print
 
 Read MCU memory:
 sudo klippy-env/bin/python  klipper/scripts/dump_mcu.py -s 0x0 -l 0x3 ../../dev/prusa-einsy debug.bin && hd -v debug.bin
+
+make && make flash FLASH_DEVICE=../../../dev/serial/by-id/usb-Prusa_Research__prusa3d.com__Original_Prusa_i3_MK3_CZPX4322X004XK91837-if00 && sudo ../klippy-env/bin/python klippy/klippy.py ../printer_data/config/printer.cfg -I ../printer_data/comms/klippy.serial

@@ -100,9 +100,7 @@ void command_query_analog_in(uint32_t *args)
     a->min_value = args[5];
     a->max_value = args[6];
     a->range_check_count = args[7];
-    // output("a->adc_cfg.admux=%c", a->adc_cfg.admux);
-    // output("a->min_value=%hi", a->min_value);
-    // output("a->max_value=%hi", a->max_value);
+    output("a->adc_chn.admux:%c a->min_value:%hi a->max_value:%hi", a->adc_cfg.admux, a->min_value, a->max_value);
     if (!a->sample_count)
         return;
     sched_add_timer(&a->timer);
