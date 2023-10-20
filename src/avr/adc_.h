@@ -94,16 +94,16 @@ static inline void adc_chn_sel(adc_channel_t *adc_chn)
     // Set the channel to sample
     ADCSRB = adc_chn->adcsrb;
     ADMUX = adc_chn->admux;
-    output("Channel selected! ADCSRB:%c ADMUX:%c", ADCSRB, ADMUX);
+    // output("Channel selected! ADCSRB:%c ADMUX:%c", ADCSRB, ADMUX);
 
 }
 
 static inline void adc_sample(void)
 {
     // Start the sample
-    output("Sampling triggered!");
+    // output("Sampling triggered!");
     ADCSRA |= (1 << ADSC);
-    output("Did we really start a conversion? ADCSRA:%c ", ADCSRA);
+    // output("Did we really start a conversion? ADCSRA:%c ", ADCSRA);
     return;
 }
 
@@ -115,7 +115,7 @@ static inline void adc_acquire(mutex_t *mut_cb, mutex_t *mut_chn)
         *mut_cb = ACQUIRED;
         *mut_chn = ACQUIRED;
         irq_enable();
-        output("ADC acquired!");
+        // output("ADC acquired!");
         return;
     }
     irq_enable();
@@ -130,13 +130,13 @@ static inline void adc_release(mutex_t *mut_cb, mutex_t *mut_chn)
         *mut_chn = RELEASED;
     }
     irq_enable();
-    output("ADC released!");
+    // output("ADC released!");
 }
 
 // Read the ADC conversion results and handle sign bit
 static inline void adc_read(volatile int16_t *value, bool differential_inputs)
 {
-    output("Did we really finish a conversion? ADSC:%c ADIF:%c", (ADCSRA & (1 << ADSC)), (ADCSRA & (1 << ADIF)));
+    // output("Did we really finish a conversion? ADSC:%c ADIF:%c", (ADCSRA & (1 << ADSC)), (ADCSRA & (1 << ADIF)));
     // Clear ADC conversion complete flag
     ADCSRA |= (1 << ADIF);
     if(!differential_inputs)

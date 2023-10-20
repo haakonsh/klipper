@@ -119,13 +119,13 @@ class PrinterADCtoTemperatureAVR:
         # logging.info(type(params['value']))
         # logging.info("ADC value passed to _handle_analog_in_state: ")
         # logging.info(params['value'])
-        if(self.name == 'extruder'):
-            print("Raw ADC codes from '%-11s': %.3f" % (self.name, params['value']))
         
         # Normalize the raw ADC value (0.0 to 1.0). Thermistor.calc_temp() requirement.
         self._last_value = self.calc_temp(params['value'])
         # print("calc_temp from '%s': %.3f" % (self.name, self._last_value))
-
+        # if(self.name == 'extruder'):
+            # print("ADC codes:%.3f calculated temp:%.3f from [%-11s]" % (params['value'], self._last_value, self.name))
+            
         # Need to convert the accumulated ADC codes to temperature[C]. What format?
         next_clock = self._mcu.clock32_to_clock64(params['next_clock'])
         last_read_clock = next_clock - self._report_clock
@@ -149,11 +149,12 @@ class PT1000_WheatStone(PrinterADCtoTemperatureAVR):
     def calc_temp(self, raw_adc): # Convert ADC value to temperature
         
         # Normalize the raw ADC value (0.0 to 1.0). Thermistor.calc_temp() requirement.
-        adc_normalized = self._normalization_vector * raw_adc
+        # adc_normalized = self._normalization_vector * raw_adc
+        adc_scaled = (raw_adc / self._sample_count)*(self._vref/512) / 10
         # print("Raw ADC codes from '%s' after normalization: %.3f" % (self.name, adc_normalized))
 
         # Find the voltage across the PT1000 sensor, 'adc_normalized' is normalized to a unit vector of 1
-        pt1000_voltage = (self._reference_resistor_voltage * self._normalization_vector) + adc_normalized
+        pt1000_voltage = self._reference_resistor_voltage + adc_scaled
         # print("PT1000 voltage from '%s': %.3f" % (self.name, pt1000_voltage))
         
         # Find the resistance of the PT1000 sensor based on its measured voltage and the wheatstone parameters
@@ -161,6 +162,11 @@ class PT1000_WheatStone(PrinterADCtoTemperatureAVR):
         
         # Find the temperature(in celcius) of the PT1000 sensor based on its temp/res parameters its calculated resistance
         temp = (pt1000_resistance - self._r0)/self._alpha
+        print("Raw ADC:%.3f   Scaled ADC:%.3f   PT1000 Voltage:%.3f   PT1000 Resistance:%.3f   PT1000 Temp[C]:%.3f" % (raw_adc,
+                                                                                                               adc_scaled,
+                                                                                                               pt1000_voltage,
+                                                                                                               pt1000_resistance,
+                                                                                                               temp))
         return temp
     
     def calc_adc(self, temp): # Convert temperature to ADC value. Used to set min/max. Reverse of calc_temp()

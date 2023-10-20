@@ -53,16 +53,16 @@ analog_in_event(struct timer *timer)
             case READY_TO_SAMPLE:
                 adc_sample();
                 a->adc_chn.state = READY_TO_SAMPLE_AGAIN;
-                a->timer.waketime += (24 + 1) * 128 + 200;   // 25ADC CLK + 12.5µs
+                a->timer.waketime += (24 + 1) * 128 + 200 + a->sample_time;   // 25ADC CLK + 12.5µs + a->sample_time
                 a->value = 0;
                 return SF_RESCHEDULE;
             
             case READY_TO_SAMPLE_AGAIN:                
                 // Read and store last ADC conversion
                 adc_read(&val, a->adc_chn.differential_inputs);
-                output("mux:%c val:%hi", a->adc_chn.mux, val);
+                // output("mux:%c val:%hi", a->adc_chn.mux, val);
                 a->value += val;
-                output("mux:%c value:%hi", a->adc_chn.mux, a->value);
+                // output("mux:%c value:%hi", a->adc_chn.mux, a->value);
 
                 // Check to see if we will continue sampling or send our results to klippy host
                 if(a->state++ < a->sample_count)
@@ -169,7 +169,8 @@ void analog_in_task(void)
         uint32_t next_begin_time = a->next_begin_time;
         a->adc_chn.state = IDLE;
         irq_enable();
-        output("mux:%c value:%hi differential:%c",a->adc_chn.mux, a->value, a->adc_chn.differential_inputs);    
+        // output("mux:%c value:%hi differential:%c",a->adc_chn.mux, a->value, a->adc_chn.differential_inputs);    
+        // output("mux:%c value:%hi",a->adc_chn.mux, a->value);    
         sendf("analog_in_state oid=%c next_clock=%u value=%hi", oid, next_begin_time, value);
     }
 }

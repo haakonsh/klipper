@@ -164,3 +164,7 @@ Do I need to use both MCU.register_config_callback(PrinterADCtoTemperatureAVR._b
 19.10.2023: Why the fuck are they using variable length data types embedded in strings, on an 8-bit AVR? Python already supports binary data types...
 
 19.10.2023: diff inputs are not sampling, I suspect the unchecked 125µs settling delay is ignored by the other ADC channel.
+
+20.10.2023 Rewrote the ADC driver. First conversion is not done when read the ADC!
+
+20.10.2023 Got temperatures. Needs some tweaking, but it seems legit.
