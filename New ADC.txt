@@ -168,3 +168,39 @@ Do I need to use both MCU.register_config_callback(PrinterADCtoTemperatureAVR._b
 20.10.2023 Rewrote the ADC driver. First conversion is not done when read the ADC!
 
 20.10.2023 Got temperatures. Needs some tweaking, but it seems legit.
+
+22.10.2023 ADC Measurements
+
+PT1000 ref resistor = 1748 Ohm, 1.353V. 4.98V-1.353V = 3.627V ==> Ref pullup = 4685.9 Ohm
+PT1000 at 0.937V, 
+4.7k test resistor = 4.53k Ohm 
+
+
+ADC0 4.53kOhm test resistor at 0501.2  ADC codes = 2.4399V ==> 4716.03 Ohm pullup, 2.4511V Multimeter ==> 4673.79 Ohm
+ADC0 'open'   test resistor at 1022.35 ADC codes = 4.977V, 4.98V Multimeter
+ADC0 'closed' test resistor at 0.0     ADC codes = 0.0V, 0.0V Multimeter
+ADC0 1748 Ohm test resistor at 275.6   ADC codes = 1.3416V ==> 4740.55 Ohm pullup, 1.3542V Multimeter ==> 4680.18 Ohm
+
+
+ADC1 4.53kOhm test resistor at 0501.1  ADC codes = 2.4394V ==> 4717.93 Ohm pullup, 2.4515V Multimeter ==> 4672.28 Ohm
+ADC1 'open'   test resistor at 1022.7  ADC codes = 4.979V, 4.98V Multimeter
+ADC1 'closed' test resistor at 0.0     ADC codes = 0.0V, 0.0V Multimeter
+ADC1 1748 Ohm test resistor at 275.75  ADC codes = 1.3424V ==> 4736.68 Ohm pullup, 1.3550V Multimeter ==> 4676.38 Ohm
+
+ADC2 4.53kOhm test resistor at 0501.7  ADC codes = 2.4423V ==> 4706.85 Ohm pullup, 2.453V Multimeter ==> 4666.66 Ohm
+ADC2 'open'   test resistor at 1022.7  ADC codes = 4.979V, 4.98V Multimeter
+ADC2 'closed' test resistor at 0.0     ADC codes = 0.0V, 0.0V Multimeter
+ADC2 1748 Ohm test resistor at 276.20  ADC codes = 1.3446V ==> 4726.07 Ohm pullup, 1.3560V Multimeter ==> 4671.65 Ohm
+
+
+
+TODO: run single-ended offset calibration by using the GND and Vref channels
+
+23.10.2023:
+	    Ir [µA]	    Vref [mV]	R [Ohm]
+ADC2	1054	    4979	    4722.9
+ADC1	1052.3	    4979	    4730.5
+ADC0	1051.9	    4979	    4732.3
+
+
+

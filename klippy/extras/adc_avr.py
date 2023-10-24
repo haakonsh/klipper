@@ -6,6 +6,7 @@
 
 import logging, bisect, mcu, math, msgproto, serialhdl
 from .thermistor import Thermistor
+import numpy as np
 
 ######################################################################
 # Interface between MCU adc and heater temperature callbacks
@@ -37,6 +38,7 @@ class PrinterADCtoTemperatureAVR:
         self._last_value = 0
         self._single_ended = False
         self._config_error = config.error
+
 
         self._mcu.register_config_callback(self._build_config)
         # If any error occurs during config: raise config.error("my error")
@@ -146,27 +148,31 @@ class PT1000_WheatStone(PrinterADCtoTemperatureAVR):
         self._alpha = config.getfloat('alpha', 3.85055, above=0.)
         self._reference_resistor_voltage = self._vref * (self._reference_resistor/(self._reference_resistor + self._reference_pullup_resistor))
         
+        self.fifo = np.full(10, -3200, dtype=np.int16)
+        
     def calc_temp(self, raw_adc): # Convert ADC value to temperature
         
-        # Normalize the raw ADC value (0.0 to 1.0). Thermistor.calc_temp() requirement.
+        self.fifo = np.roll(self.fifo, 1)
+        np.put(self.fifo, [0], raw_adc)
+        self.adc_avg = np.average(self.fifo)#, weights=np.arange(self.fifo.size, 0, -1))       
+        adc_avg_div8 = (self.adc_avg/self._sample_count)-0.1 #offset        
+
         # adc_normalized = self._normalization_vector * raw_adc
-        adc_scaled = (raw_adc / self._sample_count)*(self._vref/512) / 10
-        # print("Raw ADC codes from '%s' after normalization: %.3f" % (self.name, adc_normalized))
+        adc_scaled = adc_avg_div8*(self._vref/512) / 10
 
         # Find the voltage across the PT1000 sensor, 'adc_normalized' is normalized to a unit vector of 1
         pt1000_voltage = self._reference_resistor_voltage + adc_scaled
-        # print("PT1000 voltage from '%s': %.3f" % (self.name, pt1000_voltage))
         
         # Find the resistance of the PT1000 sensor based on its measured voltage and the wheatstone parameters
         pt1000_resistance =  ((pt1000_voltage/self._vref)*self._pt1000_pullup_resistor)/(1-(pt1000_voltage/self._vref))
         
         # Find the temperature(in celcius) of the PT1000 sensor based on its temp/res parameters its calculated resistance
         temp = (pt1000_resistance - self._r0)/self._alpha
-        print("Raw ADC:%.3f   Scaled ADC:%.3f   PT1000 Voltage:%.3f   PT1000 Resistance:%.3f   PT1000 Temp[C]:%.3f" % (raw_adc,
-                                                                                                               adc_scaled,
-                                                                                                               pt1000_voltage,
-                                                                                                               pt1000_resistance,
-                                                                                                               temp))
+
+        print(f'Codes: {adc_avg_div8: 5.1f}\n'
+        f'\t\tADC scaled: {adc_scaled*1000: 6.1f} mV' f'\tPT1000 voltage:     {pt1000_voltage*1000: 6.1f} mV\n'
+        f'\t\tTemp:       {temp: 6.1f} C'             f'\tPT1000 Resistance: {pt1000_resistance: 6.1f} Ohm' )
+
         return temp
     
     def calc_adc(self, temp): # Convert temperature to ADC value. Used to set min/max. Reverse of calc_temp()
@@ -194,11 +200,31 @@ class BedTempMK3S(PrinterADCtoTemperatureAVR, Thermistor):
                                 t3=config.getfloat('t3', 0., above=0.),
                                 r3=config.getfloat('r3', 0., above=0.),
                                 name=config.get_name())
+
+        self.fifo = np.full(10, 7845, dtype=np.int16)
+
     def calc_temp(self, raw_adc):
+        
+        self.fifo = np.roll(self.fifo, 1)
+        np.put(self.fifo, [0], raw_adc)
+        self.adc_avg = np.average(self.fifo)#, weights=np.arange(self.fifo.size, 0, -1))       
+        adc_avg_div8 = (self.adc_avg/self._sample_count)-0.1 #offset
+
+        self.adc_gain_corr = -4.58 + 4.88 * adc_avg_div8 - 4.63*10**(-6)*adc_avg_div8**2
+        self.adc_gain_corr_normalized =self.adc_gain_corr / 4979.0
+        # print("ADC after normalization:             %.4f" % self.adc_gain_corr)
+        temp_gain_corr = self.thermistor.calc_temp(self.adc_gain_corr_normalized)
+
+        adc_voltage = adc_avg_div8*(4979/1024)
         # Normalize the raw ADC value (0.0 to 1.0). Thermistor.calc_temp() requirement.
-        adc_normalized = self._normalization_vector * raw_adc
-        # print("Raw ADC codes from '%s' after normalization: %.3f" % (self.name, adc_normalized))
-        return self.thermistor.calc_temp(adc_normalized)
+        adc_normalized = self._normalization_vector * self.adc_avg
+        # print("adc_normalized:                      %.4f" % adc_normalized)
+        temp = self.thermistor.calc_temp(adc_normalized)
+        print(f'Codes: {adc_avg_div8: 6.1f}\n'
+              f'\t\tADC LR: {self.adc_gain_corr: 6.1f} mV\t' f'ADC : {adc_voltage: 6.1f} mV\n'
+              f'\t\tTemp LR: {temp_gain_corr: 6.1f} C     \t' f'Temp:  {temp: 6.1f} C')
+    
+        return temp
 
     def calc_adc(self, temp):# Convert temperature to ADC value. Used to set min/max. Reverse of calc_temp()   
         raw_adc = int(self.thermistor.calc_adc(temp) * 1024 * self._sample_count)

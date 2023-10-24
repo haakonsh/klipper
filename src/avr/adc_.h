@@ -68,7 +68,7 @@ static inline void adc_setup(adc_channel_t *adc_chn, uint8_t adcsra, uint8_t adc
     if(adc_chn->mux & ADC_DIFF_MASK) adc_chn->differential_inputs = 1; 
     else adc_chn->differential_inputs = 0;
             
-    if ((adc_chn->mux & 0b00011110) == 0b00011110) // Vbg, Vgnd, or one of the two reserved channels.
+    if ((adc_chn->mux & 0b00111110) == 0b00111110) // Vbg, Vgnd, or one of the two reserved channels.
         shutdown("Not a valid ADC input channel");
 
     // Initial state and mutex
