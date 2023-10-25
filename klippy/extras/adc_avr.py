@@ -153,9 +153,10 @@ class PT1000_WheatStone(PrinterADCtoTemperatureAVR):
         
     def calc_temp(self, raw_adc): # Convert ADC value to temperature
         
-        self.fifo = np.roll(self.fifo, 1)
-        np.put(self.fifo, [0], raw_adc)
-        self.adc_avg = np.average(self.fifo)#, weights=np.arange(self.fifo.size, 0, -1))       
+        # self.fifo = np.roll(self.fifo, 1)
+        # np.put(self.fifo, [0], raw_adc)
+        # self.adc_avg = np.average(self.fifo)#, weights=np.arange(self.fifo.size, 0, -1))       
+        self.adc_avg = raw_adc       
         adc_avg_div8 = (self.adc_avg/self._sample_count) 
 
         # adc_normalized = self._normalization_vector * raw_adc
@@ -220,9 +221,10 @@ class BedTempMK3S(PrinterADCtoTemperatureAVR, Thermistor):
 
     def calc_temp(self, raw_adc):
         
-        self.fifo = np.roll(self.fifo, 1)
-        np.put(self.fifo, [0], raw_adc)
-        self.adc_avg = np.average(self.fifo)#, weights=np.arange(self.fifo.size, 0, -1))       
+        # self.fifo = np.roll(self.fifo, 1)
+        # np.put(self.fifo, [0], raw_adc)
+        # self.adc_avg = np.average(self.fifo)#, weights=np.arange(self.fifo.size, 0, -1))       
+        self.adc_avg = raw_adc     
         adc_avg_div8 = (self.adc_avg/self._sample_count)
 
         self.adc_gain_corr = self.adc_gain_correction_coefficient_2*adc_avg_div8**2 + self.adc_gain_correction_coefficient_1*adc_avg_div8 + self.adc_gain_correction_coefficient_0

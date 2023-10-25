@@ -50,14 +50,14 @@ analog_in_event(struct timer *timer)
                 }
                 return SF_RESCHEDULE;
 
-            case READY_TO_SAMPLE:
+            case READY_TO_SAMPLE: /* First conversion requires 24 ADC cycles to complete */
                 adc_sample();
                 a->adc_chn.state = READY_TO_SAMPLE_AGAIN;
                 a->timer.waketime += (24 + 1) * 128 + 200 + a->sample_time;   // 25ADC CLK + 12.5µs + a->sample_time
                 a->value = 0;
                 return SF_RESCHEDULE;
             
-            case READY_TO_SAMPLE_AGAIN:                
+            case READY_TO_SAMPLE_AGAIN: /* Main sampling state */
                 // Read and store last ADC conversion
                 adc_read(&val, a->adc_chn.differential_inputs);
                 // output("mux:%c val:%hi", a->adc_chn.mux, val);
@@ -98,7 +98,7 @@ analog_in_event(struct timer *timer)
     }
     else // ADC Mutex not acquired
     {
-        adc_acquire(&mut_cb, &a->adc_chn.mut);
+        adc_acquire(&mut_cb, &a->adc_chn.mut);  // Try to acquire mutex
         if(a->adc_chn.mut == ACQUIRED)
         {
             // Select channel
