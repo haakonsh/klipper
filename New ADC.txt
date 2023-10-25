@@ -158,7 +158,12 @@ This is valid for MCU_adc and similar classes, but there's still some questions.
 
 Do I need to use both MCU.register_config_callback(PrinterADCtoTemperatureAVR._build_config) and 
  PrinterHeaters.add_sensor_factory(PrinterADCtoTemperatureAVR.name, PrinterADCtoTemperatureAVR.create) ?
-
+ - Yes, the PrinterHeaters.add_sensor_factory() adds our BedTempMK3S and PT1000_WheatStone classes to a list of available sensors 
+    that can be referenced from the sensor type name, bed_temp and hotend_temp. These sensor types can now be instantiated if needed.
+    The _build_config callback allows the PrinterHeaters objects to intitialize the sensor objects with configs that are set in the
+    PrinterHeaters's own config sections (not accessable by the sensors otherwise) before we create the MCU commands. One example where
+    this is useful is when setting a sensor's minimum and maximum temperatures, who in turn passes these limits to the physical MCU
+    who will then enter a shutdown state if these temperatures are exceeded.(temp limits have basic low-pass filter)
 
 
 19.10.2023: Why the fuck are they using variable length data types embedded in strings, on an 8-bit AVR? Python already supports binary data types...
